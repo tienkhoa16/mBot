@@ -20,7 +20,7 @@
 #define IR_LEFT         A0
 #define IR_RIGHT        A1
 #define COLOUR_NO       50
-#define K_DIST          128
+#define K_DIST          255/2
 
 #define DIST_LEFT          200
 #define DIST_RIGHT         200
@@ -55,6 +55,7 @@ void stopRunning(int i = 0) {
 
 void moveForward() {
   int dx = getDist();
+  Serial.print("dx: "); Serial.print(dx); Serial.println();
     
   // Normalise to MOTORSPEED
   int maxx = FORWARD_SPEED + (dx >= 0 ? dx : -dx);
@@ -72,10 +73,12 @@ void moveForward() {
 int getDist() {
   // Take raw value and threshold
   int irVolt = analogRead(IR_LEFT);
+  Serial.print("LEFT: "); Serial.print(irVolt); Serial.println();
   if (irVolt < DIST_LEFT) // turn right
     return (irVolt - DIST_LEFT) * K_DIST / DIST_LEFT;
 
   irVolt = analogRead(IR_RIGHT);
+  Serial.print("RIGHT: "); Serial.print(irVolt); Serial.println();
   if (irVolt < DIST_RIGHT) // turn left
     return (DIST_RIGHT - irVolt) * K_DIST / DIST_RIGHT;
   
@@ -138,7 +141,7 @@ bool isAtBlackLine() {
 
 void getColor() {
   // Read colours
-    Serial.print("Put COLOR sample. Calibrating MIN in ");
+  Serial.print("Put COLOR sample. Calibrating MIN in ");
   for (int i = 0; i < CALLIBRATE_SEC; i++) {
     Serial.print(i); Serial.print(".. "); delay(1000);
   }
