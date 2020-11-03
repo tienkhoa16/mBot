@@ -2,8 +2,8 @@
 #include "Notes.h"
 
 /*** Configurations ***/
-#define IR_LEFT         A0
-#define IR_RIGHT        A1
+#define IR_LEFT         A1
+#define IR_RIGHT        A0
 #define LDR_PIN         A6
 #define LED_PIN         7
 #define BUZZER_PIN      8
@@ -22,8 +22,8 @@ MeBuzzer                buzzer;
 #define TIME_MUL                   5                        // time multiplier for IR adjustment
 #define K_DIST                     (255/2)                  // max correction to mvmt
 #define D_FRONT                    10                       // cm
-#define V_LEFTIR                   200                      // threshold for IR sensor values
-#define V_RIGHTIR                  200
+#define V_LEFTIR                   548                      // threshold for IR sensor values
+#define V_RIGHTIR                  654
 
 // Color
 #define COL_DIST        5000                    // threshold for comparing colours
@@ -40,7 +40,7 @@ MeBuzzer                buzzer;
 
 // Calibration
 #define CALLIBRATE_SEC  3                       // delay before IR and colour calibration
-#define NUM_OF_SAMPLES  50                      // number of samples for calibration
+#define NUM_OF_SAMPLES  1000                      // number of samples for calibration
 #define IR_WAIT         100                     // delay between IR measurements
 #define RGB_WAIT        100                     // delay between each LED flash
 #define LDR_WAIT        10                      // delay between each LDR measurement
@@ -70,6 +70,7 @@ void setup() {
   // calibrateWB();
   // calibrateIR();
   busy = false;
+//  getAvgDist();
 }
 
 void stopRunning(const int i);
@@ -113,14 +114,32 @@ void stopRunning(const int i = 10) {
 
 void moveForward() {
   if (ultraSensor.distanceCm() < D_FRONT) return;
-  const int dx = getDist();
-    
-  // Normalise to MOTOR_SPEED
-  int maxx = MOTOR_SPEED + (dx >= 0 ? dx : -dx);
-  leftWheel.run((long long)(-MOTOR_SPEED + dx) * MOTOR_SPEED / maxx);
-  rightWheel.run((long long)(MOTOR_SPEED + dx) * MOTOR_SPEED / maxx);
-
-  delay(TIME_DELAY * TIME_MUL);
+  int forwardSpeed = MOTOR_SPEED;
+  int dx = getDist();
+//  Serial.print("dx: "); Serial.print(dx); Serial.println();  
+  // Normalise to forwardSpeed
+  int maxx = forwardSpeed + (dx >= 0 ? dx : -dx);
+//  leftWheel.run(-MOTOR_SPEED);
+//  rightWheel.run(MOTOR_SPEED * 0.77);
+  if (dx > 0) {
+    leftWheel.run((double)(-forwardSpeed + dx) * forwardSpeed / maxx);
+    rightWheel.run((double)(forwardSpeed + dx) * 0.9 * forwardSpeed / maxx);
+//    Serial.print("LEFT SPEED: "); Serial.println((double)(-forwardSpeed + dx) * 0.5 * forwardSpeed / maxx);
+//    Serial.print("RIGHT SPEED: "); Serial.println((double)(forwardSpeed + dx) * forwardSpeed / maxx);
+//    delay(25);
+  } else if (dx < 0) {
+    leftWheel.run((double)(-forwardSpeed + dx) * forwardSpeed / maxx);
+    rightWheel.run((double)(forwardSpeed + dx) * 0.5 * forwardSpeed / maxx);      
+//    Serial.print("LEFT SPEED: "); Serial.println((double)(-forwardSpeed + dx) * forwardSpeed / maxx);
+//    Serial.print("RIGHT SPEED: "); Serial.println((double)(forwardSpeed + dx) * 0.76 * forwardSpeed / maxx);
+  }
+  else {
+    leftWheel.run((double)(-forwardSpeed + dx) * 1.5 * forwardSpeed / maxx);
+    rightWheel.run((double)(forwardSpeed + dx) * 0.77 * forwardSpeed / maxx);      
+//    Serial.print("LEFT SPEED: "); Serial.println((double)(-forwardSpeed + dx) * forwardSpeed / maxx);
+//    Serial.print("RIGHT SPEED: "); Serial.println((double)(forwardSpeed + dx) * 0.76 * forwardSpeed / maxx);
+  }
+  delay(20);
   stopRunning(0);
 }
 
@@ -170,17 +189,24 @@ void uTurn() {
 }
 
 
-
 /*** Sensors ***/
 int getDist() {
   // Take raw value and threshold
-  int irVolt = analogRead(IR_LEFT);
-  if (irVolt < V_LEFTIR) // turn right
-    return (irVolt - V_LEFTIR) * K_DIST / V_LEFTIR;
+//  int irVoltLeft = analogRead(IR_LEFT);
+//  int irVoltRight = analogRead(IR_RIGHT);
+//  if (irVolLeft >= V_LEFTIR && irVoltRight >= V_RIGHTIR) {
+//    return 0;  
+//  }
 
-  irVolt = analogRead(IR_RIGHT);
+  int irVolt = analogRead(IR_RIGHT);
+  Serial.print("RIGHT: "); Serial.print(irVolt); Serial.println();
   if (irVolt < V_RIGHTIR) // turn left
     return (V_RIGHTIR - irVolt) * K_DIST / V_RIGHTIR;
+
+  irVolt = analogRead(IR_LEFT);
+  Serial.print("LEFT: "); Serial.print(irVolt); Serial.println();
+  if (irVolt < V_LEFTIR) // turn right
+    return (irVolt - V_LEFTIR) * K_DIST / V_LEFTIR;
   
   return 0;
 }
@@ -402,4 +428,18 @@ void getColourCode() {
     Serial.print(colourArray[i]); Serial.print(", ");
   }
   led.setColor(0,0,0); led.show();  
+}
+
+void getAvgDist() {
+  // Take raw value and threshold
+  float totalLeft = 0;
+  float totalRight = 0;
+  for (int i = 0; i < NUM_OF_SAMPLES; i++) {
+    totalLeft += analogRead(IR_LEFT);
+    totalRight += analogRead(IR_RIGHT);
+  }
+  float avgLeft = totalLeft / NUM_OF_SAMPLES;
+  float avgRight = totalRight / NUM_OF_SAMPLES;
+  Serial.print("LEFT: "); Serial.print(avgLeft); Serial.println();
+  Serial.print("RIGHT: "); Serial.print(avgRight); Serial.println();
 }
