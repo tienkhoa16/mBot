@@ -9,7 +9,7 @@
 #define BUZZER_PIN      8
 MeDCMotor               leftWheel(M1);
 MeDCMotor               rightWheel(M2);
-MeLineFollower          lineFinder(PORT_2);     
+MeLineFollower          lineFinder(PORT_1);     
 MeUltrasonicSensor      ultraSensor(PORT_3);    
 MeRGBLed                led(LED_PIN);
 MeBuzzer                buzzer;
@@ -21,20 +21,21 @@ MeBuzzer                buzzer;
 #define TIME_DELAY                 20                       // delay b4 recheck position
 #define TIME_MUL                   5                        // time multiplier for IR adjustment
 #define K_DIST                     (255/2)                  // max correction to mvmt
-#define D_FRONT                    10                       // cm
-#define V_LEFTIR                   516                      // threshold for IR sensor values
-#define V_RIGHTIR                  618
+#define D_FRONT                    5                        // cm
+#define V_LEFTIR                   435                      // threshold for IR sensor values
+#define V_RIGHTIR                  570
+#define RIGHT_TURN                 556
 
 // Color
-#define COL_DIST        5000                    // threshold for comparing colours
-#define BLA_VAL         {255, 217, 243}
-#define GRE_VAL         {116, 108, 130}
+#define COL_DIST        4000                    // threshold for comparing colours
+#define BLA_VAL         {270, 255, 284}
+#define GRE_VAL         {323, 282, 325}
 
-#define RED_ARR         {185, 35, 35}           // normalised RGB values
-#define GRE_ARR         {45, 100, 60}
-#define YEL_ARR         {255, 175, 100}
-#define PUR_ARR         {155, 150, 200}
-#define BLU_ARR         {175, 240, 240}
+#define RED_ARR         {204, 81, 77}           // normalised RGB values
+#define GRE_ARR         {52, 124, 66}
+#define YEL_ARR         {255, 206, 121}
+#define PUR_ARR         {140, 145, 189}
+#define BLU_ARR         {167, 233, 220}
 #define BLA_ARR         {0,0,0}
 #define NUM_OF_COLOURS  6                       // black, red, green, yellow, purple, blue
 
@@ -42,14 +43,14 @@ MeBuzzer                buzzer;
 #define CALLIBRATE_SEC  3                       // delay before IR and colour calibration
 #define NUM_OF_SAMPLES  50                      // number of samples for calibration
 #define IR_WAIT         100                     // delay between IR measurements
-#define RGB_WAIT        100                     // delay between each LED flash
+#define RGB_WAIT        50                      // delay between each LED flash
 #define LDR_WAIT        10                      // delay between each LDR measurement
 #define LED_MAX         255                     // max value of each RGB component
 
 
 
 /********** Global Variables **********/
-bool busy = true;
+bool busy = false;
 
 int irArray[2][2] = {{68,10},{81,19}}; // left-right, minmax
 int blackArray[] = BLA_VAL;
@@ -67,8 +68,13 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   Serial.begin(9600);
 
-  // calibrateWB();
-  // calibrateIR();
+//   calibrateWB();
+//   calibrateIR();
+//  uTurn();
+//  doubleRight();
+//  doubleLeft();
+//  getColourCode();
+//  printColour(getColour());
   busy = false;
 //  getAvgDist();
 }
@@ -76,33 +82,32 @@ void setup() {
 void stopRunning(const int i);
 
 void loop() {
-//  if (busy) return;
-//
-//  if (!isAtBlackLine()) { // both sensors not in black line
-//    moveForward();
-//    return;
-//  }
-//  
-//  // waypoint detected
-//  busy = true;
-//  stopRunning(0);
-//
-//  // color challenge
-//  int colourRes;
-//  do {
-//    colourRes = getColour();
-//    printColour(colourRes);
-//  } while (colourRes == -1);
-//
-//  if (colourRes > 0) { // is color challenge (not black)
-//    colorWaypoint(colourRes);
-//    busy = false;
-//    return;
-//  }
-//
-//  // finished
-//  finishWaypoint();
-  moveForward();
+  if (busy) return;
+
+  if (isAtBlackLine() == true) { // both sensors not in black line
+    // waypoint detected
+    busy = true;
+    stopRunning(0);
+  
+    // color challenge
+    int colourRes;
+    do {
+      colourRes = getColour();
+//      printColour(colourRes);
+    } while (colourRes == -1);
+  
+    if (colourRes > 0) { // is color challenge (not black)
+      colorWaypoint(colourRes);
+      busy = false;
+      return;
+    }
+    
+    // finished
+    finishWaypoint();
+  }
+  else {
+    moveForward();
+  }
 }
 
 
@@ -113,25 +118,27 @@ void stopRunning(const int i = 10) {
   if (i) delay(TIME_DELAY * i);
 }
 
+// right motor is 
 int rightSpeed = MOTOR_SPEED * 0.78;
 int leftSpeed = -MOTOR_SPEED;
 
 void moveForward() {
-  Serial.println(ultraSensor.distanceCm());
+//  Serial.println(ultraSensor.distanceCm());
   if (ultraSensor.distanceCm() < D_FRONT) {
     stopRunning();
     return;
   }
   
-  int new_delay = 90;
-  int change = getDist();
+  int new_delay = 50;
+  int leftReading = analogRead(IR_LEFT);
+  int rightReading = analogRead(IR_RIGHT);
 
-  if (change < 0) {
+  if (leftReading < V_LEFTIR) {
     rightWheel.stop();
     leftWheel.run(-MOTOR_SPEED);
     delay(new_delay);
   }
-  else if (change > 0) {
+  else if (rightReading < V_RIGHTIR) {
     leftWheel.stop();
     rightWheel.run(MOTOR_SPEED);
     delay(new_delay);
@@ -183,27 +190,20 @@ void doubleLeft() {
 }
 
 void uTurn() {
-  turnRight();
-  turnRight();
+  int rightReading = analogRead(IR_RIGHT);
+
+  if (rightReading < RIGHT_TURN) {
+    turnLeft();
+    turnLeft();
+  }
+  else {
+    turnRight();
+    turnRight();
+  }
 }
 
 
 /*** Sensors ***/
-int getDist() {
-  // Take raw value and threshold
-  int irVolt;
-  
-  irVolt = analogRead(IR_LEFT);
-  if (irVolt < V_LEFTIR) // turn right
-    return -1;
-    
-  irVolt = analogRead(IR_RIGHT);
-  if (irVolt < V_RIGHTIR) // turn left
-    return 1;
-  
-  return 0;
-}
-
 long long square(const long long x) { return x * x; }
 
 int getColour() {
@@ -222,6 +222,7 @@ int getColour() {
       colourArray[i] += analogRead(LDR_PIN);
       delay(LDR_WAIT);
     }
+    
     colourArray[i] /= NUM_OF_SAMPLES;
     colourArray[i] = (colourArray[i] - blackArray[i]) * 255 / greyDiff[i];
     Serial.println(colourArray[i]);
@@ -236,14 +237,14 @@ int getColour() {
     for (int j = 0; j < 3; j++)
       curr_dist += square(allColourArray[i][j] - colourArray[j]);
 
-    if (min_dist > curr_dist && curr_dist > 0) {
+    if (curr_dist <= COL_DIST && curr_dist < min_dist) {
       idx = i;
       min_dist = curr_dist;
     }
   }
-
-  // Returns index of best color
   return idx;
+  // Returns index of best color
+  return -1;
 }
 
 bool isAtBlackLine() {
@@ -288,6 +289,7 @@ void finishWaypoint() {
     // stop the waveform generation before the next note.
     buzzer.noTone(BUZZER_PIN);
   }
+  busy = 1;
 }
 
 
