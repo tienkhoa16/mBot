@@ -28,14 +28,14 @@ MeBuzzer                buzzer;
 
 // Color
 #define COL_DIST        4000                    // threshold for comparing colours
-#define BLA_VAL         {270, 255, 284}
-#define GRE_VAL         {323, 282, 325}
+#define BLA_VAL         {253, 236, 267}
+#define GRE_VAL         {188, 155, 184}
 
-#define RED_ARR         {204, 81, 77}           // normalised RGB values
+#define RED_ARR         {204, 34, 40}           // normalised RGB values
 #define GRE_ARR         {52, 124, 66}
-#define YEL_ARR         {255, 206, 121}
-#define PUR_ARR         {140, 145, 189}
-#define BLU_ARR         {167, 233, 220}
+#define YEL_ARR         {260, 160, 70}
+#define PUR_ARR         {120, 125, 189}
+#define BLU_ARR         {130, 200, 200}
 #define BLA_ARR         {0,0,0}
 #define NUM_OF_COLOURS  6                       // black, red, green, yellow, purple, blue
 
@@ -52,7 +52,6 @@ MeBuzzer                buzzer;
 /********** Global Variables **********/
 bool busy = false;
 
-int irArray[2][2] = {{68,10},{81,19}}; // left-right, minmax
 int blackArray[] = BLA_VAL;
 int greyDiff[] = GRE_VAL;
 static int allColourArray[6][3] = {BLA_ARR, RED_ARR, GRE_ARR, YEL_ARR, PUR_ARR, BLU_ARR};
@@ -68,15 +67,7 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   Serial.begin(9600);
 
-//   calibrateWB();
-//   calibrateIR();
-//  uTurn();
-//  doubleRight();
-//  doubleLeft();
-//  getColourCode();
-//  printColour(getColour());
   busy = false;
-//  getAvgDist();
 }
 
 void stopRunning(const int i);
@@ -93,7 +84,6 @@ void loop() {
     int colourRes;
     do {
       colourRes = getColour();
-//      printColour(colourRes);
     } while (colourRes == -1);
   
     if (colourRes > 0) { // is color challenge (not black)
@@ -123,7 +113,6 @@ int rightSpeed = MOTOR_SPEED * 0.78;
 int leftSpeed = -MOTOR_SPEED;
 
 void moveForward() {
-//  Serial.println(ultraSensor.distanceCm());
   if (ultraSensor.distanceCm() < D_FRONT) {
     stopRunning();
     return;
@@ -243,8 +232,6 @@ int getColour() {
     }
   }
   return idx;
-  // Returns index of best color
-  return -1;
 }
 
 bool isAtBlackLine() {
@@ -292,52 +279,7 @@ void finishWaypoint() {
   busy = 1;
 }
 
-
 /*** Calibration ***/
-void calibrateIR() {
-  Serial.println("CALIBRATING IR SENSORS");
-
-  // Min values
-  Serial.print("COVER SENSORS. Calibrating MIN in ");
-  for (int i = CALLIBRATE_SEC; i > 0; --i) {
-    Serial.print(i); Serial.print(".. "); delay(1000);
-  }
-  irArray[0][0] = irArray[1][0] = 0;
-  for (int i = 0; i < NUM_OF_SAMPLES; ++i) {
-    irArray[0][0] += analogRead(IR_LEFT);
-    irArray[1][0] += analogRead(IR_RIGHT);
-    delay(IR_WAIT);
-  }
-  irArray[0][0] /= NUM_OF_SAMPLES;
-  irArray[1][0] /= NUM_OF_SAMPLES;
-  Serial.println("done.");
-
-  // Max values
-  Serial.print("UNCOVER SENSORS. Calibrating MAX in ");
-  for (int i = CALLIBRATE_SEC; i > 0; i--) {
-    Serial.print(i); Serial.print(".. "); delay(1000);
-  }
-  irArray[0][1] = irArray[1][1] = 0;
-  for (int i = 0; i < NUM_OF_SAMPLES; ++i) {
-    irArray[0][1] += analogRead(IR_LEFT);
-    irArray[1][1] += analogRead(IR_RIGHT);
-    delay(IR_WAIT);
-  }
-  irArray[0][1] /= NUM_OF_SAMPLES;
-  irArray[1][1] /= NUM_OF_SAMPLES;
-
-  // Save range
-  irArray[0][1] -= irArray[0][0]; // left range
-  irArray[1][1] -= irArray[1][0]; // right range
-
-  // Output calibrated
-  Serial.print("int irArray[2][2] = {{");
-  Serial.print(irArray[0][0]); Serial.print(",");
-  Serial.print(irArray[0][1]); Serial.print("},{");
-  Serial.print(irArray[1][0]); Serial.print(",");
-  Serial.print(irArray[1][1]); Serial.println("}};");
-}
-
 void calibrateWB() {
   int whiteArray[3] = {0};
 
